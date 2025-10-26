@@ -37,15 +37,26 @@ export async function createAlbumPage(imageData: Record<string, string>): Promis
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
     // 2. Draw the title
-    ctx.fillStyle = '#333';
-    ctx.textAlign = 'center';
+    try {
+        const logoImg = await loadImage('https://i.ibb.co/dKSm9sN/logo.png');
+        const logoAspectRatio = logoImg.naturalWidth / logoImg.naturalHeight; // Should be ~1
+        const logoWidth = 600;
+        const logoHeight = logoWidth / logoAspectRatio;
+        const logoX = (canvasWidth - logoWidth) / 2;
+        const logoY = 100;
+        ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
+    } catch (e) {
+        console.error("Could not load logo for album page, falling back to text.", e);
+        // Fallback to text if image fails to load
+        ctx.fillStyle = '#333';
+        ctx.textAlign = 'center';
+        ctx.font = `bold 120px 'Caveat', cursive`;
+        ctx.fillText('Past Forward', canvasWidth / 2, 150);
+        ctx.font = `60px 'Roboto', sans-serif`;
+        ctx.fillStyle = '#555';
+        ctx.fillText('by ehabgm.online', canvasWidth / 2, 230);
+    }
 
-    ctx.font = `bold 120px 'Caveat', cursive`;
-    ctx.fillText('Past Forward', canvasWidth / 2, 150);
-
-    ctx.font = `60px 'Roboto', sans-serif`;
-    ctx.fillStyle = '#555';
-    ctx.fillText('by ehabgm.online', canvasWidth / 2, 230);
 
     // 3. Load all the polaroid images concurrently
     const decades = Object.keys(imageData);
@@ -60,7 +71,7 @@ export async function createAlbumPage(imageData: Record<string, string>): Promis
 
     // 4. Define grid layout and draw each polaroid
     const grid = { cols: 2, rows: 3, padding: 100 };
-    const contentTopMargin = 300; // Space for the header
+    const contentTopMargin = 750; // Space for the header
     const contentHeight = canvasHeight - contentTopMargin;
     const cellWidth = (canvasWidth - grid.padding * (grid.cols + 1)) / grid.cols;
     const cellHeight = (contentHeight - grid.padding * (grid.rows + 1)) / grid.rows;

@@ -21,12 +21,14 @@ export const DraggableCardBody = ({
   dragConstraintsRef,
   onDrag,
   onDragStart,
+  onShake,
 }: {
   className?: string;
   children?: React.ReactNode;
   dragConstraintsRef?: React.RefObject<HTMLElement>;
   onDrag?: (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
   onDragStart?: (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void;
+  onShake?: () => void;
 }) => {
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -105,14 +107,33 @@ export const DraggableCardBody = ({
       onDragEnd={(event, info) => {
         document.body.style.cursor = "default";
  
+        const { offset, velocity } = info;
+        const velocityMagnitude = Math.sqrt(velocity.x ** 2 + velocity.y ** 2);
+        const offsetMagnitude = Math.sqrt(offset.x ** 2 + offset.y ** 2);
+
+        // Define thresholds for a "shake" gesture
+        const SHAKE_VELOCITY_THRESHOLD = 600; // High velocity
+        const SHAKE_OFFSET_THRESHOLD = 60;   // But small travel distance
+
+        if (velocityMagnitude > SHAKE_VELOCITY_THRESHOLD && offsetMagnitude < SHAKE_OFFSET_THRESHOLD) {
+            // Trigger a visual shake animation
+            controls.start({
+                rotate: [0, -10, 10, -10, 10, -5, 5, 0],
+                transition: { duration: 0.6, ease: "easeInOut" }
+            });
+            // Fire the callback
+            onShake?.();
+            return; // Don't apply the regular bounce animation
+        }
+        
         const currentVelocityX = velocityX.get();
         const currentVelocityY = velocityY.get();
  
-        const velocityMagnitude = Math.sqrt(
+        const velocityMagnitudeBounce = Math.sqrt(
           currentVelocityX * currentVelocityX +
             currentVelocityY * currentVelocityY,
         );
-        const bounce = Math.min(0.8, velocityMagnitude / 1000);
+        const bounce = Math.min(0.8, velocityMagnitudeBounce / 1000);
  
         animate(info.point.x, info.point.x + currentVelocityX * 0.3, {
           duration: 0.8,

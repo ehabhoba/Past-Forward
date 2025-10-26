@@ -27,7 +27,7 @@
     <meta property="twitter:description" content="Travel through time! Upload your photo and let AI reimagine you in different decades, from the 1950s to the 2000s." />
     <meta property="twitter:image" content="https://i.ibb.co/CKhtn0B/banner.jpg" />
 
-    <link rel="icon" type="image/png" href="https://i.ibb.co/Mkz8p82/logo.png" />
+    <link rel="icon" type="image/png" href="https://i.ibb.co/dKSm9sN/logo.png" />
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -52,6 +52,27 @@
         background: linear-gradient(-45deg, #0f0c29, #302b63, #24243e, #1c1c3c);
         background-size: 400% 400%;
         animation: gradient-animation 15s ease infinite;
+      }
+      /* New animation for the image reveal */
+      @keyframes develop-effect {
+        0% {
+          filter: sepia(100%) contrast(1.1) brightness(0.9) blur(1px);
+          opacity: 0.8;
+        }
+        100% {
+          filter: sepia(0%) contrast(1) brightness(1) blur(0px);
+          opacity: 1;
+        }
+      }
+      .image-develop {
+        animation: develop-effect 2.5s ease-in-out forwards;
+      }
+      /* New texture for the back of the card */
+      .developing-back {
+        background-color: #e0e0e0;
+        background-image:
+            radial-gradient(circle at 1px 1px, rgba(0,0,0,0.08) 1px, transparent 0);
+        background-size: 3px 3px;
       }
     </style>
   <script type="importmap">

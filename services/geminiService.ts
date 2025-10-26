@@ -2,7 +2,8 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { GoogleGenAI } from "@google/genai";
+// FIX: Import Modality for specifying image output.
+import { GoogleGenAI, Modality } from "@google/genai";
 import type { GenerateContentResponse } from "@google/genai";
 
 const API_KEY = process.env.API_KEY;
@@ -41,6 +42,15 @@ function extractDecade(prompt: string): string | null {
  * @returns A data URL string for the generated image.
  */
 function processGeminiResponse(response: GenerateContentResponse): string {
+    // Check for safety blocks first, which can result in an empty candidates array.
+    const blockReason = response.promptFeedback?.blockReason;
+    if (blockReason) {
+        const blockMessage = response.promptFeedback?.blockReasonMessage || `Reason: ${blockReason}`;
+        console.error(`Prompt was blocked by the API. ${blockMessage}`);
+        // Provide a more user-friendly message.
+        throw new Error(`Image generation was blocked for safety reasons. This can sometimes happen with portraits. Please try a different photo.`);
+    }
+
     const imagePartFromResponse = response.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
 
     if (imagePartFromResponse?.inlineData) {
@@ -48,9 +58,10 @@ function processGeminiResponse(response: GenerateContentResponse): string {
         return `data:${mimeType};base64,${data}`;
     }
 
+    // If no image and not blocked, it's an unexpected text response from the model.
     const textResponse = response.text;
     console.error("API did not return an image. Response:", textResponse);
-    throw new Error(`The AI model responded with text instead of an image: "${textResponse || 'No text response received.'}"`);
+    throw new Error(`The AI model responded with text instead of an image: "${textResponse || 'No content received.'}"`);
 }
 
 /**
@@ -68,6 +79,11 @@ async function callGeminiWithRetry(imagePart: object, textPart: object): Promise
             return await ai.models.generateContent({
                 model: 'gemini-2.5-flash-image',
                 contents: { parts: [imagePart, textPart] },
+                // FIX: Added config to specify the response should be an image.
+                // This is required for the 'gemini-2.5-flash-image' model.
+                config: {
+                    responseModalities: [Modality.IMAGE],
+                },
             });
         } catch (error) {
             console.error(`Error calling Gemini API (Attempt ${attempt}/${maxRetries}):`, error);
@@ -114,14 +130,16 @@ export async function generateDecadeImage(imageDataUrl: string, prompt: string):
         return processGeminiResponse(response);
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-        const isNoImageError = errorMessage.includes("The AI model responded with text instead of an image");
+        const isNoImageError = errorMessage.includes("responded with text instead of an image");
+        const isSafetyBlock = errorMessage.includes("blocked for safety reasons");
 
-        if (isNoImageError) {
-            console.warn("Original prompt was likely blocked. Trying a fallback prompt.");
+        // If the prompt was blocked or didn't produce an image, try the fallback.
+        if (isNoImageError || isSafetyBlock) {
+            console.warn(`Original prompt failed (${isSafetyBlock ? 'safety block' : 'no image response'}). Trying a fallback prompt.`);
             const decade = extractDecade(prompt);
             if (!decade) {
                 console.error("Could not extract decade from prompt, cannot use fallback.");
-                throw error; // Re-throw the original "no image" error.
+                throw error; // Re-throw the original error.
             }
 
             // --- Second attempt with the fallback prompt ---
@@ -133,11 +151,11 @@ export async function generateDecadeImage(imageDataUrl: string, prompt: string):
                 return processGeminiResponse(fallbackResponse);
             } catch (fallbackError) {
                 console.error("Fallback prompt also failed.", fallbackError);
-                const finalErrorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
-                throw new Error(`The AI model failed with both original and fallback prompts. Last error: ${finalErrorMessage}`);
+                // Throw the error from the fallback attempt, as it's more relevant.
+                throw fallbackError;
             }
         } else {
-            // This is for other errors, like a final internal server error after retries.
+            // This is for other unrecoverable errors.
             console.error("An unrecoverable error occurred during image generation.", error);
             throw new Error(`The AI model failed to generate an image. Details: ${errorMessage}`);
         }

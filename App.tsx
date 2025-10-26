@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import React, { useState, ChangeEvent, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { generateDecadeImage } from './services/geminiService';
 import PolaroidCard from './components/PolaroidCard';
+import ProgressBar from './components/ProgressBar'; // Import the new component
 import { createAlbumPage } from './lib/albumUtils';
 import Footer from './components/Footer';
 
@@ -234,15 +235,16 @@ function App() {
             setIsDownloading(false);
         }
     };
+    
+    // Calculate progress for the progress bar
+    const progress = (Object.values(generatedImages).filter(img => img.status !== 'pending').length / DECADES.length) * 100;
 
     return (
         <main className="animated-gradient text-neutral-200 min-h-screen w-full flex flex-col items-center justify-center p-4 pb-24 overflow-hidden relative">
             
             <div className="z-10 flex flex-col items-center justify-center w-full h-full flex-1 min-h-0">
                 <div className="text-center mb-10">
-                    <img src="https://i.ibb.co/Mkz8p82/logo.png" alt="ehabgm.online logo" className="w-24 h-24 mx-auto mb-4"/>
-                    <h1 className="text-6xl md:text-8xl font-caveat font-bold text-neutral-100">Past Forward</h1>
-                    <p className="font-permanent-marker text-neutral-300 mt-2 text-xl tracking-wide">Generate yourself through the decades.</p>
+                    <img src="https://i.ibb.co/dKSm9sN/logo.png" alt="Past Forward Logo" className="w-64 md:w-80 mx-auto"/>
                 </div>
 
                 {appState === 'idle' && (
@@ -302,46 +304,21 @@ function App() {
                          </div>
                     </div>
                 )}
-
-                {(appState === 'generating' || appState === 'results-shown') && (
-                     <>
-                        {isMobile ? (
-                            <div className="w-full max-w-sm flex-1 overflow-y-auto mt-4 space-y-8 p-4">
-                                {DECADES.map((decade) => (
-                                    <div key={decade} className="flex justify-center">
-                                         <PolaroidCard
-                                            caption={decade}
-                                            status={generatedImages[decade]?.status || 'pending'}
-                                            imageUrl={generatedImages[decade]?.url}
-                                            error={generatedImages[decade]?.error}
-                                            onShake={handleRegenerateDecade}
-                                            onDownload={handleDownloadIndividualImage}
-                                            onShare={handleShareIndividualImage}
-                                            isMobile={isMobile}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div ref={dragAreaRef} className="relative w-full max-w-5xl h-[600px] mt-4">
-                                {DECADES.map((decade, index) => {
-                                    const { top, left, rotate } = POSITIONS[index];
-                                    return (
-                                        <motion.div
+                
+                <AnimatePresence>
+                    {(appState === 'generating' || appState === 'results-shown') && (
+                         <>
+                            {isMobile ? (
+                                <div className="w-full max-w-sm flex-1 overflow-y-auto mt-4 space-y-8 p-4">
+                                    {DECADES.map((decade, index) => (
+                                        <motion.div 
                                             key={decade}
-                                            className="absolute cursor-grab active:cursor-grabbing"
-                                            style={{ top, left }}
-                                            initial={{ opacity: 0, scale: 0.5, y: 100, rotate: 0 }}
-                                            animate={{ 
-                                                opacity: 1, 
-                                                scale: 1, 
-                                                y: 0,
-                                                rotate: `${rotate}deg`,
-                                            }}
-                                            transition={{ type: 'spring', stiffness: 100, damping: 20, delay: index * 0.15 }}
+                                            initial={{ opacity: 0, y: 50 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 50, transition: { duration: 0.3, delay: index * 0.05 } }}
+                                            transition={{ duration: 0.5, delay: index * 0.1 }}
                                         >
-                                            <PolaroidCard 
-                                                dragConstraintsRef={dragAreaRef}
+                                             <PolaroidCard
                                                 caption={decade}
                                                 status={generatedImages[decade]?.status || 'pending'}
                                                 imageUrl={generatedImages[decade]?.url}
@@ -352,28 +329,79 @@ function App() {
                                                 isMobile={isMobile}
                                             />
                                         </motion.div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                         <div className="h-20 mt-4 flex items-center justify-center">
-                            {appState === 'results-shown' && (
-                                <div className="flex flex-col sm:flex-row items-center gap-4">
-                                    <button 
-                                        onClick={handleDownloadAlbum} 
-                                        disabled={isDownloading} 
-                                        className={`${primaryButtonClasses} disabled:opacity-50 disabled:cursor-not-allowed`}
-                                    >
-                                        {isDownloading ? 'Creating Album...' : 'Download Album'}
-                                    </button>
-                                    <button onClick={handleReset} className={secondaryButtonClasses}>
-                                        Start Over
-                                    </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div ref={dragAreaRef} className="relative w-full max-w-5xl h-[600px] mt-4">
+                                    {DECADES.map((decade, index) => {
+                                        const { top, left, rotate } = POSITIONS[index];
+                                        return (
+                                            <motion.div
+                                                key={decade}
+                                                className="absolute cursor-grab active:cursor-grabbing"
+                                                style={{ top, left }}
+                                                initial={{ opacity: 0, scale: 0.5, y: 100, rotate: 0 }}
+                                                animate={{ 
+                                                    opacity: 1, 
+                                                    scale: 1, 
+                                                    y: 0,
+                                                    rotate: `${rotate}deg`,
+                                                }}
+                                                exit={{
+                                                    ...GHOST_POLAROIDS_CONFIG[index].initial,
+                                                    opacity: 0,
+                                                    scale: 0,
+                                                    transition: { duration: 0.8, ease: 'circIn' }
+                                                }}
+                                                transition={{ type: 'spring', stiffness: 100, damping: 20, delay: index * 0.15 }}
+                                            >
+                                                <PolaroidCard 
+                                                    dragConstraintsRef={dragAreaRef}
+                                                    caption={decade}
+                                                    status={generatedImages[decade]?.status || 'pending'}
+                                                    imageUrl={generatedImages[decade]?.url}
+                                                    error={generatedImages[decade]?.error}
+                                                    onShake={handleRegenerateDecade}
+                                                    onDownload={handleDownloadIndividualImage}
+                                                    onShare={handleShareIndividualImage}
+                                                    isMobile={isMobile}
+                                                />
+                                            </motion.div>
+                                        );
+                                    })}
                                 </div>
                             )}
-                        </div>
-                    </>
-                )}
+                             <div className="h-20 mt-4 flex items-center justify-center">
+                                <AnimatePresence mode="wait">
+                                    {appState === 'generating' && (
+                                        <ProgressBar key="progress-bar" progress={progress} />
+                                    )}
+
+                                    {appState === 'results-shown' && (
+                                        <motion.div 
+                                            key="results-buttons"
+                                            className="flex flex-col sm:flex-row items-center gap-4"
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.5, duration: 0.5 }}
+                                        >
+                                            <button 
+                                                onClick={handleDownloadAlbum} 
+                                                disabled={isDownloading} 
+                                                className={`${primaryButtonClasses} disabled:opacity-50 disabled:cursor-not-allowed`}
+                                            >
+                                                {isDownloading ? 'Creating Album...' : 'Download Album'}
+                                            </button>
+                                            <button onClick={handleReset} className={secondaryButtonClasses}>
+                                                Start Over
+                                            </button>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </>
+                    )}
+                </AnimatePresence>
             </div>
             <Footer />
         </main>
